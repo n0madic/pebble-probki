@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Probki Settings</title>
+		<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+		<script src="//code.jquery.com/jquery-1.11.1.min.js"></script>
+		<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+		<script src="//api-maps.yandex.ru/2.1/?lang=ru_RU&coordorder=longlat" type="text/javascript"></script>
+		<script>
+			$(document).ready(function () {
+				$('input').focusout(function () {
+					var inputVal = $(this).val();
+					var latReg = /^(\-?\d+(\.\d+)?),\s*(\-?\d+(\.\d+)?)$/;
+					if (!latReg.test(inputVal)) {
+						$(this).parent().addClass('has-error');
+						$('#alert').removeClass("hide");
+					} else {
+						$(this).parent().removeClass('has-error');
+						if (!$('.has-error')[0])
+							$('#alert').addClass("hide");
+					}
+				});
+
+				$('#map-home').click(function () {
+					ymaps.ready(mapinit($('#home')));
+				});
+
+				$('#map-work').click(function () {
+					ymaps.ready(mapinit($('#work')));
+				});
+
+				function mapinit(input) {
+
+					if (input.val())
+						createMap(input.val().split(','));
+					else
+						ymaps.geolocation.get().then(function (result) {
+							createMap(result.geoObjects.get(0).geometry.getCoordinates());
+						});
+
+					function createMap(center) {
+						var myPlacemark, myMap;
+						myMap = new ymaps.Map('map', {
+							center: center,
+							zoom: 16
+						});
+
+						var centerPlacemark = new ymaps.Placemark(myMap.getCenter(), {
+						}, {
+							preset: 'islands#redDotIcon'
+						});
+
+						myMap.geoObjects.add(centerPlacemark);
+
+						// Слушаем клик на карте
+						myMap.events.add('click', function (e) {
+							myMap.geoObjects.remove(centerPlacemark);
+							var coords = e.get('coords');
+
+							// Если метка уже создана – просто передвигаем ее
+							if (myPlacemark) {
+								myPlacemark.geometry.setCoordinates(coords);
+							}
+							// Если нет – создаем.
+							else {
+								myPlacemark = createPlacemark(coords);
+								myMap.geoObjects.add(myPlacemark);
+								// Слушаем событие окончания перетаскивания на метке.
+								myPlacemark.events.add('dragend', function () {
+									getAddress(myPlacemark.geometry.getCoordinates());
+								});
+							}
+							getAddress(coords);
+							input.val(coords[0].toFixed(6) + ',' + coords[1].toFixed(6));
+							input.parent().removeClass('has-error');
+						});
+
+						// Создание метки
+						function createPlacemark(coords) {
+							return new ymaps.Placemark(coords, {
+								iconContent: 'поиск...'
+							}, {
+								preset: 'islands#violetStretchyIcon',
+								draggable: true
+							});
+						}
+
+						// Определяем адрес по координатам (обратное геокодирование)
+						function getAddress(coords) {
+							myPlacemark.properties.set('iconContent', 'поиск...');
+							ymaps.geocode(coords).then(function (res) {
+								var firstGeoObject = res.geoObjects.get(0);
+
+								myPlacemark.properties
+										.set({
+											iconContent: firstGeoObject.properties.get('name'),
+											balloonContent: firstGeoObject.properties.get('text')
+										});
+							});
+
+						}
+						$('#MapModal').on('hide.bs.modal', function (e) {
+							myMap.destroy();
+						});
+					}
+				}
+
+			});
+		</script>
+	</head>
+	<body>
+		<div class="container-fluid">
+			<div class="row">
+				<div class="col-xs-12">
+					<h3>Настройки Пробок</h3>
+				</div>
+			</div>
+			<section>
+				<div class="row col-xs-12">
+					<div class="form-group">
+						<label for="home"><h4>Координаты дома</h4></label>
+						<div class="input-group">
+							<input class="form-control" type="text" id="home" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="долгота,широта" />
+							<span class="input-group-btn">
+								<button class="btn btn-default" id="map-home" data-toggle="modal" data-target="#MapModal">Карта</button>
+							</span>
+						</div>
+					</div>
+				</div>
+				<div class="row col-xs-12">
+					<div class="form-group">
+						<label for="home"><h4>Координаты работы</h4></label>
+						<div class="input-group">
+							<input class="form-control" type="text" id="work" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="долгота,широта" />
+							<span class="input-group-btn">
+								<button class="btn btn-default" id="map-work" data-toggle="modal" data-target="#MapModal">Карта</button>
+							</span>
+						</div>
+					</div>
+				</div>
+				<a id="save-button" class="btn btn-primary">Сохранить</a>
+				<div id="alert" class="alert alert-danger hide" role="alert" style="margin-top: 10px;">Введите координаты через запятую: долгота,широта</div>
+			</section>
+
+			<div class="modal" id="MapModal">
+				<div class="modal-dialog">
+					<div class="modal-content">
+						<div class="modal-header">
+							<h4 class="modal-title">Выберите объект на карте</h4>
+						</div>
+						<div class="modal-body">
+							<div id="map" style="height:70%;" />
+						</div>
+						<div class="modal-footer">
+							<button id="close" type="button" class="btn btn-default" data-dismiss="modal">Закрыть</button>
+						</div>
+					</div><!-- /.modal-content -->
+				</div><!-- /.modal-dialog -->
+			</div><!-- /.modal -->
+
+		</div>
+		<script>
+			$(function () {
+				var setOptions = function () {
+					var options = window.location.hash;
+					if (!options) {
+						return {};
+					}
+					var options = JSON.parse(decodeURIComponent(options.substr(1)));
+					if (!options) {
+						return {};
+					}
+					$('#home').val(options.home ? options.home : '');
+					$('#work').val(options.work ? options.work : '');
+					return options;
+				};
+
+				var getOptions = function () {
+					var options = {};
+					options.home = $('#home').val();
+					options.work = $('#work').val();
+					return options;
+				};
+
+				$('#save-button').on('click', function () {
+					if (!$('.has-error')[0]) {
+						document.location = 'pebblejs://close#' + encodeURIComponent(JSON.stringify(getOptions()));
+						console.log(document.location);
+					}
+				});
+
+				setOptions();
+			});
+		</script>
+	</body>
+</html>
