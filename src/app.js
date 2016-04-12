@@ -58,29 +58,40 @@ simply.on('singleClick', function(e) {
 });
 
 function get_traf() {
-  ajax({ url: 'http://m.yandex.ru' }, 
+  ajax({ url: 'http://export.yandex.ru/bar/reginfo.xml' }, 
     function(data){
       fetch_error = false;
-      var city_title = data.match(/window.where_by_ip = "(.*?)"/);
+      var city_title = data.match(/<title>(.*?)<\/title>/);
       city_title = (city_title !== null) ? city_title[1] : "";
-      var city_subtitle = data.match(/<div class="b-traffic__num">(.*?)</);
+      var city_subtitle = data.match(/<level>(.*?)<\/level>/);
       city_subtitle = (city_subtitle !== null) ? city_subtitle[1]+points(city_subtitle[1]) : "";
-      var city_body = data.match(/<div class="b-traffic-forecast__text">(.*?)<\/div>/);
+      var city_body = data.match(/<hint lang="ru">(.*?)<\/hint>/);
       city_body = (city_body !== null) ? city_body[1] : "";
-      if (data.match(/<div class="b-traffic-forecast__title">Прогноз<\/div>/)) {
-        var point = [];
-        data.replace(/<div class="b-traffic-forecast__value b-traffic-forecast__value_ball_.">(\d)/g, 
+      ajax({ url: 'http://m.yandex.ru' }, function(data){
+        data.replace(/<span class="mheader3__locate__text">(.*?)<\/span>/g, 
+                   function(match, text){
+                        simply.title(text);
+                  });
+        data.replace(/<span class="informers3__item-num">(\d)/g, 
+                   function(match, text){
+                        simply.subtitle(text+points(text));
+                  });
+        if (data.match(/<div class="traffic-icon-forecast__title">/)) {
+          var point = [];
+          data.replace(/<div class="notifications_type_traffic__icon__text">(\d)/g, 
                    function(match, text){
                         point.push(text);
                     });
-        var hours = [];
-        data.replace(/<div class="b-traffic-forecast__hour">(\d{1,2})/g,
+          var hours = [];
+          data.replace(/<div class="traffic-icon-forecast__hour-inner">(\d{1,2})/g,
                    function(match, text){
                         hours.push(text);
                     });
-        var i;
-        for (i = 0; i < point.length; i++) city_body = city_body + hours[i]+'й час - '+point[i]+' '+points(point[i])+'\n'; 
-      }
+          var forecast = '';
+          for (var i = 0; i < point.length; i++) forecast = forecast + hours[i]+'й час - '+point[i]+' '+points(point[i])+'\n'; 
+          simply.body(forecast);
+        }
+      });
       simply.text({ title: city_title,
                subtitle: city_subtitle,
                body: city_body
